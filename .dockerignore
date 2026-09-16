@@ -1,0 +1,9 @@
+.git
+.gitignore
+*.tar
+Dockerfile
+Jenkinsfile
+jenkinfile*
+*.md
+scripts/
+.vscode

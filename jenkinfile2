@@ -1,0 +1,79 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME     = 'mi-app-web'
+        CONTAINER_NAME = 'mi-contenedor-web'
+
+        // ====================================================================
+        // ---> AJUSTA ESTAS VARIABLES A TU ENTORNO <---
+        // ====================================================================
+        VM_IP          = '192.168.1.122'               // IP de tu máquina destino (VirtualBox / Ubuntu)
+        VM_USER        = 'jenkins'                     // Usuario con permisos en la máquina destino
+        SSH_KEY_PATH   = '/var/lib/jenkins/.ssh/id_rsa' // Ruta de la clave privada generada en el servidor Jenkins
+    }
+
+    stages {
+        stage('Descargar código') {
+            steps {
+                // Al ejecutarse vía Webhook o Poll SCM (* * * * *), toma los cambios recién subidos
+                checkout scm
+            }
+        }
+
+        stage('Construir Imagen Docker') {
+            steps {
+                echo 'Construyendo imagen Docker actualizada...'
+                sh "docker build -t ${IMAGE_NAME}:latest ."
+            }
+        }
+
+        stage('Empaquetar Imagen') {
+            steps {
+                echo 'Convirtiendo imagen a archivo .tar para enviarla por SSH...'
+                sh "docker save ${IMAGE_NAME}:latest -o ${IMAGE_NAME}.tar"
+            }
+        }
+
+        stage('Enviar a VM remota') {
+            steps {
+                echo 'Enviando imagen empaquetada a la VM destino...'
+                sh "scp -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ${IMAGE_NAME}.tar ${VM_USER}@${VM_IP}:/tmp/${IMAGE_NAME}.tar"
+            }
+        }
+
+        stage('Desplegar en VM remota') {
+            steps {
+                echo 'Desplegando la nueva versión del contenedor en la VM remota...'
+                sh """
+                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ${VM_USER}@${VM_IP} '
+                        echo "Deteniendo contenedor previo si existe..."
+                        docker stop ${CONTAINER_NAME} || true
+                        docker rm ${CONTAINER_NAME} || true
+                        echo "Cargando nueva imagen..."
+                        docker load -i /tmp/${IMAGE_NAME}.tar
+                        echo "Iniciando contenedor en http://${VM_IP}:80..."
+                        docker run -d -p 80:80 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest
+                        echo "Eliminando archivo temporal .tar..."
+                        rm -f /tmp/${IMAGE_NAME}.tar
+                    '
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Limpiando archivos temporales en el servidor Jenkins...'
+            sh "rm -f ${IMAGE_NAME}.tar"
+        }
+        success {
+            echo "========================================================="
+            echo " ¡Despliegue automático exitoso en http://${VM_IP}:80! "
+            echo "========================================================="
+        }
+        failure {
+            echo 'El despliegue automático falló. Revisa la salida de la consola.'
+        }
+    }
+}
