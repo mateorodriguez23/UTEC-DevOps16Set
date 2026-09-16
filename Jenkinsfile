@@ -8,8 +8,8 @@ pipeline {
         // ====================================================================
         // ---> CAMBIA ESTAS VARIABLES POR LOS DATOS DE TU ENTORNO <---
         // ====================================================================
-        VM_IP     = '192.168.1.122'      // IP de la máquina destino (donde corre el contenedor)
-        VM_USER   = 'jenkins'            // Usuario SSH en la máquina destino
+        VM_IP     = '192.168.56.101'      // IP de la máquina destino (donde corre el contenedor)
+        VM_USER   = 'user'            // Usuario SSH en la máquina destino
         SSH_CREDS = 'ssh-vm-vmware'      // ID de la credencial creada en Jenkins (Paso 3)
         // REPO_URL = 'https://github.com/TU_USUARIO/TU_REPOSITORIO.git'
     }
